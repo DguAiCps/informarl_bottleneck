@@ -29,7 +29,7 @@ MAX_SPEED = 1.0
 MAX_TIMESTEPS = 300
 
 # 스텝 단위 훈련 설정
-TOTAL_TIMESTEPS = 200000  # 원본 InforMARL과 동일
+TOTAL_TIMESTEPS = 2000000  # 원본 InforMARL과 동일
 ROLLOUT_LENGTH = 2048      # 롤아웃 버퍼 크기 (스텝 수)
 LEARNING_RATE = 3e-4
 MINI_BATCH_SIZE = 64       # 미니배치 크기
@@ -61,7 +61,7 @@ MAX_GRAD_NORM = 0.5
 # GPU 및 성능 설정
 USE_GPU_PHYSICS = True
 INCLUDE_OBSTACLES = True
-DEVICE = torch.device('cpu')  # 임시로 CPU 사용해서 디버깅
+DEVICE = torch.device('cuda')
 
 
 def main():
@@ -141,7 +141,7 @@ def main():
     episode_lengths = []
     
     # 환경 리셋
-    node_obs, adj, entity_types = env.reset()
+    env.reset()
     episode_reward = 0
     episode_length = 0
     
@@ -223,7 +223,7 @@ def main():
                 values = [values_tensor.cpu().item()] * NUM_AGENTS
             
             # 환경 스텝
-            (next_node_obs, next_adj, next_entity_types), rewards, done, info = env.step(actions)
+            _, rewards, done, info = env.step(actions)
             
             # 버퍼에 데이터 저장
             buffer.store(
@@ -238,8 +238,7 @@ def main():
                 edge_features=edge_features_np
             )
             
-            # 상태 업데이트
-            node_obs, adj, entity_types = next_node_obs, next_adj, next_entity_types
+            # 상태 업데이트 - 그래프는 매번 새로 생성하므로 불필요
             episode_reward += sum(rewards)
             episode_length += 1
             global_step += 1
@@ -289,7 +288,7 @@ def main():
                 episode_count += 1
                 
                 # 환경 리셋
-                node_obs, adj, entity_types = env.reset()
+                env.reset()
                 episode_reward = 0
                 episode_length = 0
             
@@ -449,7 +448,7 @@ def run_stepwise_demo(env, models):
     
     for episode in range(3):
         print(f"데모 에피소드 {episode + 1}")
-        node_obs, adj, entity_types = env.reset()
+        env.reset()
         episode_reward = 0
         
         for step in range(MAX_TIMESTEPS):
@@ -503,7 +502,7 @@ def run_stepwise_demo(env, models):
                 actions = actions_tensor.cpu().numpy().tolist()
             
             # 환경 스텝
-            (node_obs, adj, entity_types), rewards, done, info = env.step(actions)
+            _, rewards, done, info = env.step(actions)
             episode_reward += sum(rewards)
             
             # 렌더링

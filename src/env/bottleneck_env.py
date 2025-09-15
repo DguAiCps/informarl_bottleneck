@@ -11,7 +11,6 @@ from ..utils.types import Agent2D, Landmark2D, Obstacle2D
 from .map import create_agents_and_landmarks, create_obstacles
 from .physics import execute_continuous_action, update_positions, batch_execute_actions_gpu, batch_update_positions_gpu
 from .reward import calculate_rewards
-from .graph_builder_informarl import build_informarl_graph_observations, batch_build_informarl_graph_gpu
 from .render import BottleneckRenderer
 
 
@@ -85,10 +84,8 @@ class CleanBottleneckEnv:
         
         self.agent_success_flags = [False] * self.num_agents
         
-        # 그래프 관측 생성
-        return self._get_graph_observations()
     
-    def step(self, actions: List[List[float]]) -> Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], List[float], bool, Dict]:
+    def step(self, actions: List[List[float]]) -> Tuple[None, List[float], bool, Dict]:
         """환경 스텝"""
         self.timestep += 1
         
@@ -139,22 +136,7 @@ class CleanBottleneckEnv:
             'success_rate': (self.success_count / self.num_agents) * 100
         }
         
-        return self._get_graph_observations(), rewards, done, info
-    
-    def _get_graph_observations(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """InforMARL 그래프 관측 생성 - entity types 포함"""
-        if self.use_gpu_physics:
-            # GPU 가속 그래프 생성
-            return batch_build_informarl_graph_gpu(
-                self.agents, self.landmarks, self.obstacles, 
-                self.sensing_radius, self.device
-            )
-        else:
-            # CPU 그래프 생성
-            return build_informarl_graph_observations(
-                self.agents, self.landmarks, self.obstacles, 
-                self.sensing_radius
-            )
+        return None, rewards, done, info
     
     def get_local_observation(self, agent_id: int) -> List[float]:
         """에이전트의 로컬 관측"""
@@ -166,7 +148,7 @@ class CleanBottleneckEnv:
             agent.y / self.corridor_height,
             agent.vx / agent.max_speed,         # 정규화된 속도
             agent.vy / agent.max_speed,
-            (target.x - agent.x) / self.corridor_width,  # 목표 상대 위치
+            (target.x - agent.x) / self.corridor_width,  # 정규화된 목표 상대 위치
             (target.y - agent.y) / self.corridor_height
         ]
         

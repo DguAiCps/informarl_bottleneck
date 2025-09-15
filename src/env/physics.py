@@ -53,22 +53,18 @@ def update_positions(agents: List[Agent2D], obstacles: List[Obstacle2D],
         # 경계 충돌 검사 및 처리
         if new_x <= agent.radius:
             agent.x = agent.radius
-            agent.vx = -agent.vx * 0.5  # 반발 + 감속
             collision_count += 1
         elif new_x >= corridor_width - agent.radius:
             agent.x = corridor_width - agent.radius
-            agent.vx = -agent.vx * 0.5
             collision_count += 1
         else:
             agent.x = new_x
         
         if new_y <= agent.radius:
             agent.y = agent.radius
-            agent.vy = -agent.vy * 0.5
             collision_count += 1
         elif new_y >= corridor_height - agent.radius:
             agent.y = corridor_height - agent.radius
-            agent.vy = -agent.vy * 0.5
             collision_count += 1
         else:
             agent.y = new_y
@@ -109,11 +105,9 @@ def update_positions(agents: List[Agent2D], obstacles: List[Obstacle2D],
             else:  # lower_wall_y < agent.y < upper_wall_y (통로 내부)
                 if agent.y + margin > upper_wall_y:
                     agent.y = upper_wall_y - margin
-                    agent.vy = -abs(agent.vy) * 0.5
                     collision_count += 1
                 elif agent.y - margin < lower_wall_y:
                     agent.y = lower_wall_y + margin  
-                    agent.vy = abs(agent.vy) * 0.5
                     collision_count += 1
         
         # 장애물 충돌 검사
@@ -222,22 +216,18 @@ def batch_update_positions_gpu(agents: List[Agent2D], new_velocities: torch.Tens
         # 경계 충돌 검사 (기존 로직과 동일)
         if new_x <= agent.radius:
             agent.x = agent.radius
-            agent.vx = -agent.vx * 0.5
             collision_count += 1
         elif new_x >= corridor_width - agent.radius:
             agent.x = corridor_width - agent.radius
-            agent.vx = -agent.vx * 0.5
             collision_count += 1
         else:
             agent.x = new_x
         
         if new_y <= agent.radius:
             agent.y = agent.radius
-            agent.vy = -agent.vy * 0.5
             collision_count += 1
         elif new_y >= corridor_height - agent.radius:
             agent.y = corridor_height - agent.radius
-            agent.vy = -agent.vy * 0.5
             collision_count += 1
         else:
             agent.y = new_y
@@ -278,11 +268,9 @@ def batch_update_positions_gpu(agents: List[Agent2D], new_velocities: torch.Tens
             else:  # lower_wall_y < agent.y < upper_wall_y (통로 내부)
                 if agent.y + margin > upper_wall_y:
                     agent.y = upper_wall_y - margin
-                    agent.vy = -abs(agent.vy) * 0.5
                     collision_count += 1
                 elif agent.y - margin < lower_wall_y:
                     agent.y = lower_wall_y + margin  
-                    agent.vy = abs(agent.vy) * 0.5
                     collision_count += 1
     
     # 에이전트 간 충돌은 기존 함수 재사용

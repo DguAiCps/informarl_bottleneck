@@ -38,11 +38,11 @@ def build_unimp_graph_observations(agents: List[Agent2D], landmarks: List[Landma
         for agent in agents:
             distance = ego_agent.get_distance_to_agent(agent)
             if distance <= sensing_radius:
-                # 상대적 위치/속도 (sensing_radius로 정규화)
+                # 상대적 위치/속도 (정규화 적용 - 성능 개선을 위해)
                 rel_x = (agent.x - ego_agent.x) / sensing_radius
                 rel_y = (agent.y - ego_agent.y) / sensing_radius
-                rel_vx = agent.vx / agent.max_speed
-                rel_vy = agent.vy / agent.max_speed
+                rel_vx = (agent.vx - ego_agent.vx) / agent.max_speed  # 상대속도 + 정규화
+                rel_vy = (agent.vy - ego_agent.vy) / agent.max_speed
                 
                 # 해당 에이전트의 목표 위치 (ego 에이전트 기준) - 논문 정의
                 target = landmarks[agent.target_id] 
