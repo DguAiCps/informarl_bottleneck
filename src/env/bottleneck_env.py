@@ -17,12 +17,12 @@ from .render import BottleneckRenderer
 class CleanBottleneckEnv:
     """깔끔한 병목 환경 - InforMARL 핵심만 유지"""
     
-    def __init__(self, num_agents: int = 4, corridor_width: float = 20.0, 
+    def __init__(self, num_agents: int = 4, corridor_width: float = 20.0,
                  corridor_height: float = 10.0, bottleneck_width: float = 1.2,
                  bottleneck_pos: float = 10.0, agent_radius: float = 0.5,
                  sensing_radius: float = 3.0, max_speed: float = 1.0,
                  max_timesteps: int = 300, device=None, use_gpu_physics: bool = True,
-                 include_obstacles: bool = True):
+                 include_obstacles: bool = True, verbose: bool = True):
         
         self.num_agents = num_agents
         self.corridor_width = corridor_width
@@ -35,9 +35,10 @@ class CleanBottleneckEnv:
         self.max_timesteps = max_timesteps
         self.use_gpu_physics = use_gpu_physics
         self.include_obstacles = include_obstacles
-        
+        self.verbose = verbose
+
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
+
         # 환경 상태
         self.agents: List[Agent2D] = []
         self.landmarks: List[Landmark2D] = []
@@ -46,14 +47,16 @@ class CleanBottleneckEnv:
         self.success_count = 0
         self.collision_count = 0
         self.agent_success_flags = []
-        
+
         # 렌더러
         self.renderer = BottleneckRenderer()
-        
-        print(f"Clean InforMARL Environment initialized:")
-        print(f"  - Device: {self.device}")
-        print(f"  - GPU Physics: {self.use_gpu_physics}")
-        print(f"  - Include Obstacles: {self.include_obstacles}")
+
+        # 로그 출력 (verbose 모드에서만)
+        if self.verbose:
+            print(f"Clean InforMARL Environment initialized:")
+            print(f"  - Device: {self.device}")
+            print(f"  - GPU Physics: {self.use_gpu_physics}")
+            print(f"  - Include Obstacles: {self.include_obstacles}")
     
     def reset(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """환경 리셋"""
@@ -144,12 +147,12 @@ class CleanBottleneckEnv:
         target = self.landmarks[agent.target_id]
         
         obs = [
-            agent.x / self.corridor_width,      # 정규화된 위치
-            agent.y / self.corridor_height,
-            agent.vx / agent.max_speed,         # 정규화된 속도
-            agent.vy / agent.max_speed,
-            (target.x - agent.x) / self.corridor_width,  # 정규화된 목표 상대 위치
-            (target.y - agent.y) / self.corridor_height
+            agent.x,                            # 절대 위치
+            agent.y,
+            agent.vx,                           # 절대 속도
+            agent.vy,
+            (target.x - agent.x),               # 목표 상대 위치
+            (target.y - agent.y)
         ]
         
         return obs

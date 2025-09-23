@@ -110,8 +110,8 @@ class RolloutBuffer:
         self.path_start_idx = self.ptr
     
     def get(self) -> Dict[str, torch.Tensor]:
-        """버퍼의 모든 데이터를 반환 (학습용)"""
-        assert self.ptr == self.max_size, "Buffer not full"
+        """버퍼의 현재 데이터를 반환 (학습용)"""
+        assert self.ptr > 0, "Buffer is empty"
         
         # Advantage 정규화 (전체 에이전트에 대해)
         advantages_flat = self.advantages[:self.ptr].flatten()
@@ -119,9 +119,14 @@ class RolloutBuffer:
         adv_std = advantages_flat.std()
         self.advantages[:self.ptr] = (self.advantages[:self.ptr] - adv_mean) / (adv_std + 1e-8)
         
-        # 모든 데이터를 에이전트별로 flatten
-        batch_size = self.ptr * self.num_agents
-        
+        # 원본 InforMARL 방식: 구조를 유지하면서 flatten
+        episode_length = self.ptr
+        num_agents = self.num_agents
+        batch_size = episode_length * num_agents
+
+        # Agent ID 생성 (원본 InforMARL 방식)
+        agent_ids = np.tile(np.arange(num_agents), episode_length)  # [0,1,2,3, 0,1,2,3, ...]
+
         data = {
             'local_obs': torch.from_numpy(self.local_obs[:self.ptr].reshape(batch_size, -1)).float().to(self.device),
             'actions': torch.from_numpy(self.actions[:self.ptr].reshape(batch_size, -1)).float().to(self.device),
@@ -129,14 +134,15 @@ class RolloutBuffer:
             'returns': torch.from_numpy(self.returns[:self.ptr].reshape(batch_size)).float().to(self.device),
             'old_log_probs': torch.from_numpy(self.log_probs[:self.ptr].reshape(batch_size)).float().to(self.device),
             'old_values': torch.from_numpy(self.values[:self.ptr].reshape(batch_size)).float().to(self.device),
-            
+
             # 그래프 데이터
             'node_obs': torch.from_numpy(self.node_obs[:self.ptr].reshape(batch_size, self.max_nodes, -1)).float().to(self.device),
             'adj': torch.from_numpy(self.adj[:self.ptr].reshape(batch_size, self.max_nodes, self.max_nodes)).float().to(self.device),
             'entity_types': torch.from_numpy(self.entity_types[:self.ptr].reshape(batch_size, self.max_nodes)).long().to(self.device),
             'edge_features': torch.from_numpy(self.edge_features[:self.ptr].reshape(batch_size, self.max_nodes, self.max_nodes, self.edge_dim)).float().to(self.device),
-            
-            # centralized_obs 제거
+
+            # Agent ID 추가 (중요!)
+            'agent_ids': torch.from_numpy(agent_ids).long().to(self.device),
         }
         
         return data
@@ -149,20 +155,40 @@ class RolloutBuffer:
         """버퍼가 가득 찼는지 확인"""
         return self.ptr >= self.max_size
 
+    def has_data(self) -> bool:
+        """버퍼에 데이터가 있는지 확인"""
+        return self.ptr > self.path_start_idx
 
-class MiniBatchSampler:
-    """미니배치 샘플링을 위한 클래스"""
-    
-    def __init__(self, batch_size: int, mini_batch_size: int):
-        self.batch_size = batch_size
+
+class StepWiseSampler:
+    """스텝 단위 미니배치 샘플링 클래스 - 논문 의도에 맞게 동일 타임스텝 에이전트들을 함께 샘플링"""
+
+    def __init__(self, total_steps: int, num_agents: int, mini_batch_size: int):
+        self.total_steps = total_steps
+        self.num_agents = num_agents
         self.mini_batch_size = mini_batch_size
-        self.num_mini_batches = batch_size // mini_batch_size
-        
+
+        # 자동 계산
+        assert mini_batch_size % num_agents == 0, f"Mini-batch size {mini_batch_size} must be divisible by num_agents {num_agents}"
+        self.steps_per_batch = mini_batch_size // num_agents
+        self.num_mini_batches = total_steps // self.steps_per_batch
+
     def __iter__(self):
-        """미니배치 인덱스를 순차적으로 반환"""
-        indices = torch.randperm(self.batch_size)
-        
+        """스텝 단위로 미니배치 인덱스 반환"""
+        # 스텝을 랜덤하게 섞기
+        shuffled_steps = torch.randperm(self.total_steps)
+
         for i in range(self.num_mini_batches):
-            start_idx = i * self.mini_batch_size
-            end_idx = start_idx + self.mini_batch_size
-            yield indices[start_idx:end_idx]
+            # 선택된 스텝들
+            start_step = i * self.steps_per_batch
+            end_step = start_step + self.steps_per_batch
+            selected_steps = shuffled_steps[start_step:end_step]
+
+            # 각 스텝의 모든 에이전트 인덱스 생성
+            indices = []
+            for step in selected_steps:
+                base_idx = step * self.num_agents
+                for agent in range(self.num_agents):
+                    indices.append(base_idx + agent)
+
+            yield torch.tensor(indices, dtype=torch.long)

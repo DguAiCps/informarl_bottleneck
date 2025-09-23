@@ -38,16 +38,16 @@ def build_unimp_graph_observations(agents: List[Agent2D], landmarks: List[Landma
         for agent in agents:
             distance = ego_agent.get_distance_to_agent(agent)
             if distance <= sensing_radius:
-                # 상대적 위치/속도 (정규화 적용 - 성능 개선을 위해)
-                rel_x = (agent.x - ego_agent.x) / sensing_radius
-                rel_y = (agent.y - ego_agent.y) / sensing_radius
-                rel_vx = (agent.vx - ego_agent.vx) / agent.max_speed  # 상대속도 + 정규화
-                rel_vy = (agent.vy - ego_agent.vy) / agent.max_speed
+                # 상대적 위치/속도 (절대값 사용)
+                rel_x = agent.x - ego_agent.x
+                rel_y = agent.y - ego_agent.y
+                rel_vx = agent.vx - ego_agent.vx                    # 상대속도
+                rel_vy = agent.vy - ego_agent.vy
                 
-                # 해당 에이전트의 목표 위치 (ego 에이전트 기준) - 논문 정의
+                # 해당 에이전트의 목표 위치 (ego 에이전트 기준)
                 target = landmarks[agent.target_id] 
-                goal_x = (target.x - ego_agent.x) / sensing_radius  # p^{goal,j}_i
-                goal_y = (target.y - ego_agent.y) / sensing_radius
+                goal_x = target.x - ego_agent.x
+                goal_y = target.y - ego_agent.y
                 
                 features = [rel_x, rel_y, rel_vx, rel_vy, goal_x, goal_y]
                 entities.append((ENTITY_TYPES["agent"], agent, features, distance))
@@ -56,22 +56,22 @@ def build_unimp_graph_observations(agents: List[Agent2D], landmarks: List[Landma
         for landmark in landmarks:
             distance = ego_agent.get_distance_to(landmark.x, landmark.y)
             if distance <= sensing_radius:
-                rel_x = (landmark.x - ego_agent.x) / sensing_radius
-                rel_y = (landmark.y - ego_agent.y) / sensing_radius
+                rel_x = landmark.x - ego_agent.x
+                rel_y = landmark.y - ego_agent.y
                 
                 # landmark의 경우 goal 정보는 자기 자신 위치
-                features = [rel_x, rel_y, 0.0, 0.0, rel_x, rel_y]  # pgoal,j ≡ pji
+                features = [rel_x, rel_y, 0.0, 0.0, rel_x, rel_y]
                 entities.append((ENTITY_TYPES["landmark"], landmark, features, distance))
         
         # === 3. 센싱 범위 내 obstacle들 수집 ===
         for obstacle in obstacles:
             distance = ego_agent.get_distance_to(obstacle.x, obstacle.y)
             if distance <= sensing_radius:
-                rel_x = (obstacle.x - ego_agent.x) / sensing_radius
-                rel_y = (obstacle.y - ego_agent.y) / sensing_radius
+                rel_x = obstacle.x - ego_agent.x
+                rel_y = obstacle.y - ego_agent.y
                 
                 # obstacle의 경우도 goal 정보는 자기 자신 위치
-                features = [rel_x, rel_y, 0.0, 0.0, rel_x, rel_y]  # pgoal,j ≡ pji
+                features = [rel_x, rel_y, 0.0, 0.0, rel_x, rel_y]
                 entities.append((ENTITY_TYPES["obstacle"], obstacle, features, distance))
         
         # === 4. 최대 노드 수 제한 (거리 순으로 선택) ===
@@ -113,26 +113,23 @@ def build_unimp_graph_observations(agents: List[Agent2D], landmarks: List[Landma
                     adj[ego_idx, i, j] = 1.0
                     adj[ego_idx, j, i] = 1.0
                     
-                    # 엣지 특성: 정규화된 거리
-                    normalized_dist = min(edge_distance / sensing_radius, 1.0)
-                    edge_features[ego_idx, i, j, 0] = normalized_dist
-                    edge_features[ego_idx, j, i, 0] = normalized_dist
+                    # 엣지 특성: 절대 거리
+                    edge_features[ego_idx, i, j, 0] = edge_distance
+                    edge_features[ego_idx, j, i, 0] = edge_distance
                     
                 elif entity_type_i == ENTITY_TYPES["agent"] and entity_type_j != ENTITY_TYPES["agent"]:
                     # Non-agent to Agent: 단방향 (j → i)
                     adj[ego_idx, j, i] = 1.0  # non-agent j가 agent i에게 메시지 전송
                     
                     # 엣지 특성
-                    normalized_dist = min(edge_distance / sensing_radius, 1.0)
-                    edge_features[ego_idx, j, i, 0] = normalized_dist
+                    edge_features[ego_idx, j, i, 0] = edge_distance
                     
                 elif entity_type_i != ENTITY_TYPES["agent"] and entity_type_j == ENTITY_TYPES["agent"]:
                     # Non-agent to Agent: 단방향 (i → j)
                     adj[ego_idx, i, j] = 1.0  # non-agent i가 agent j에게 메시지 전송
                     
                     # 엣지 특성
-                    normalized_dist = min(edge_distance / sensing_radius, 1.0)
-                    edge_features[ego_idx, i, j, 0] = normalized_dist
+                    edge_features[ego_idx, i, j, 0] = edge_distance
                 
                 # Non-agent to Non-agent: 연결 안 함 (논문 규칙)
     

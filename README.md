@@ -29,15 +29,59 @@ clean_informarl/
 
 ## 실행 방법
 
+### 기본 학습
 ```bash
 # 의존성 설치
 pip install -r requirements.txt
 
-# 훈련 실행
+# 새로운 학습 시작
 python main_stepwise.py
 
 # 데모 모드 (훈련 후 y 입력)
 ```
+
+### 모델 저장/불러오기 및 학습 재개
+
+#### 1. 새로운 학습 시작
+```bash
+python main_stepwise.py
+```
+- 처음부터 새로 학습 시작
+- `saved_models/` 디렉토리에 자동 저장됨
+
+#### 2. 자동 저장 시점
+- **50,000 스텝마다**: `checkpoint_날짜시간_auto_50k.pth`
+- **10,000 스텝마다**: 최고 성능 달성 시 `checkpoint_날짜시간_best.pth`
+- **훈련 완료 시**: `checkpoint_날짜시간_final.pth`
+
+#### 3. 학습 재개
+```bash
+# 특정 체크포인트에서 재개
+python main_stepwise.py --resume saved_models/checkpoint_20231216_143022_auto_100k.pth
+
+# 다른 디렉토리 사용
+python main_stepwise.py --resume /path/to/checkpoint.pth --checkpoint-dir my_models
+```
+
+#### 4. 테스트만 실행
+```bash
+# 최고 성능 모델 자동 선택하여 테스트
+python main_stepwise.py --test-only
+
+# 특정 모델로 테스트
+python main_stepwise.py --test-only --resume saved_models/checkpoint_20231216_143022_best.pth
+```
+
+#### 5. 저장된 파일명 예시
+- `checkpoint_20231216_143022_auto_50k.pth` - 50k 스텝 자동 저장
+- `checkpoint_20231216_143022_best.pth` - 최고 성능 모델
+- `checkpoint_20231216_143022_final.pth` - 최종 완료 모델
+- `checkpoint_20231216_143022_step1500000.pth` - 일반 체크포인트
+
+#### 6. 주의사항
+- **Ctrl+C로 중단하면 저장 안됨** (다음 자동 저장까지 기다려야 함)
+- 최대 2M 스텝 중 50k마다 저장되므로 최대 49,999 스텝만 손실 가능
+- 최고 성능 모델은 따로 `best` 파일로 보관됨
 
 ## 하드코딩된 설정
 
